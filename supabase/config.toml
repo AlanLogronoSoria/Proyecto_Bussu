@@ -1,0 +1,38 @@
+# Andes Mobility - Supabase Configuration
+# =============================================================================
+
+project_id = "andes-mobility"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+
+# JWT expiry: 1 hora access token, 7 días refresh token
+[auth.jwt]
+exp = 3600
+
+[realtime]
+enabled = true
+
+[storage]
+enabled = true
+
+[edge_functions]
+enabled = true
+
+[analytics]
+enabled = false

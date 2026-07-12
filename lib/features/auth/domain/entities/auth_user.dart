@@ -1,0 +1,66 @@
+import '../../../../core/constants/app_roles.dart';
+
+/// Entidad que representa al usuario autenticado en el dominio.
+class AppUser {
+  /// ID del usuario en Supabase Auth (UUID).
+  final String id;
+
+  /// Correo electrónico del usuario.
+  final String email;
+
+  /// Nombre completo del perfil.
+  final String? fullName;
+
+  /// Rol del usuario en el sistema.
+  final UserRole role;
+
+  /// Indica si el usuario tiene suscripción Premium activa.
+  final bool isPremium;
+
+  /// Fingerprint del dispositivo vinculado.
+  final String? deviceId;
+
+  /// Fecha de creación del perfil.
+  final DateTime createdAt;
+
+  const AppUser({
+    required this.id,
+    required this.email,
+    this.fullName,
+    required this.role,
+    this.isPremium = false,
+    this.deviceId,
+    required this.createdAt,
+  });
+
+  AppUser copyWith({
+    String? id,
+    String? email,
+    String? fullName,
+    UserRole? role,
+    bool? isPremium,
+    String? deviceId,
+    DateTime? createdAt,
+  }) {
+    return AppUser(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      fullName: fullName ?? this.fullName,
+      role: role ?? this.role,
+      isPremium: isPremium ?? this.isPremium,
+      deviceId: deviceId ?? this.deviceId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AppUser && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() => 'AppUser(id: $id, email: $email, role: $role)';
+}
