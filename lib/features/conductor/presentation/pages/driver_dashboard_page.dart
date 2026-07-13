@@ -1,105 +1,62 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../providers/trip_provider.dart';
 
-class DriverDashboardPage extends StatefulWidget {
+class DriverDashboardPage extends ConsumerStatefulWidget {
   const DriverDashboardPage({super.key});
   @override
-  State<DriverDashboardPage> createState() => _DriverDashboardPageState();
+  ConsumerState<DriverDashboardPage> createState() => _DriverDashboardPageState();
 }
 
-class _DriverDashboardPageState extends State<DriverDashboardPage> {
-  bool _tripActive = false;
-  final int _tripsToday = 3;
-  final int _passengersToday = 67;
-
+class _DriverDashboardPageState extends ConsumerState<DriverDashboardPage> {
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(currentUserProvider);
+    final activeTrip = ref.watch(activeTripProvider);
+    final trip = activeTrip.valueOrNull;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        title: const Text('Dashboard', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: Color(0xFF001B44))),
-        backgroundColor: const Color(0xFFF8F9FA), elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Dashboard', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: Color(0xFF001B44))), backgroundColor: const Color(0xFFF8F9FA), elevation: 0),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        _Greeting(name: 'Carlos', plate: 'ABC-123'),
+        Row(children: [
+          const CircleAvatar(radius: 28, backgroundColor: Color(0xFF001B44), child: Icon(Icons.person, color: Colors.white, size: 28)),
+          const SizedBox(width: 12),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Buenos días, ${user?.fullName ?? "Conductor"}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF001B44), fontFamily: 'Inter')),
+            const SizedBox(height: 2),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3), decoration: BoxDecoration(color: const Color(0xFFFED000).withAlpha(40), borderRadius: BorderRadius.circular(8)), child: Text('Bus ${trip?.busId ?? "ABC-123"}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF001B44), fontFamily: 'Inter'))),
+          ]),
+        ]),
         const SizedBox(height: 16),
-        _TripStatusCard(active: _tripActive, onToggle: () => setState(() => _tripActive = !_tripActive)),
+        Container(padding: const EdgeInsets.all(24), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 8)]), child: Column(children: [
+          Icon(trip != null ? Icons.directions_bus : Icons.local_parking, size: 48, color: trip != null ? const Color(0xFF001B44) : Colors.grey),
+          const SizedBox(height: 12),
+          Text(trip != null ? 'Viaje en curso' : 'Sin viaje iniciado', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: trip != null ? const Color(0xFF001B44) : const Color(0xFF434750), fontFamily: 'Inter')),
+          if (trip != null) ...[
+            const SizedBox(height: 4),
+            Text(trip.routeId, style: const TextStyle(fontSize: 14, color: Color(0xFF434750), fontFamily: 'Inter')),
+          ],
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, child: ElevatedButton(
+            onPressed: () {},
+            style: ElevatedButton.styleFrom(backgroundColor: trip != null ? const Color(0xFFBA1A1A) : const Color(0xFF001B44), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            child: Text(trip != null ? 'Finalizar viaje' : 'Iniciar viaje', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Inter')),
+          )),
+        ])),
         const SizedBox(height: 16),
-        _DaySummary(trips: _tripsToday, passengers: _passengersToday),
+        Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: const Color(0xFF001B44), borderRadius: BorderRadius.circular(14)), child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+          _SummaryItem(value: '3', label: 'Viajes hoy', color: const Color(0xFFFED000)),
+          Container(width: 1, height: 40, color: Colors.white24),
+          _SummaryItem(value: '67', label: 'Pasajeros', color: Colors.white),
+        ])),
         const SizedBox(height: 16),
         const Text('Accesos rápidos', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF001B44), fontFamily: 'Inter')),
         const SizedBox(height: 8),
-        _QuickCard(icon: Icons.people_outline, title: 'Ocupación', subtitle: 'Ver conteo de pasajeros', onTap: () {}),
+        _QuickCard(icon: Icons.people_outline, title: 'Ocupación', subtitle: 'Conteo de pasajeros', onTap: () {}),
         _QuickCard(icon: Icons.add_location, title: 'Solicitar parada', subtitle: 'Proponer nueva parada', onTap: () {}),
         _QuickCard(icon: Icons.warning_amber, title: 'Reportar incidente', subtitle: 'Emergencia o novedad', onTap: () {}),
-      ]),
-    );
-  }
-}
-
-class _Greeting extends StatelessWidget {
-  final String name, plate;
-  const _Greeting({required this.name, required this.plate});
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      const CircleAvatar(radius: 28, backgroundColor: Color(0xFF001B44), child: Icon(Icons.person, color: Colors.white, size: 28)),
-      const SizedBox(width: 12),
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Buenos días, $name', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Color(0xFF001B44), fontFamily: 'Inter')),
-        const SizedBox(height: 2),
-        Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3), decoration: BoxDecoration(color: const Color(0xFFFED000).withAlpha(40), borderRadius: BorderRadius.circular(8)), child: Text('Bus $plate', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF001B44), fontFamily: 'Inter'))),
-      ]),
-    ]);
-  }
-}
-
-class _TripStatusCard extends StatelessWidget {
-  final bool active;
-  final VoidCallback onToggle;
-  const _TripStatusCard({required this.active, required this.onToggle});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 8)]),
-      child: Column(children: [
-        Icon(active ? Icons.directions_bus : Icons.local_parking, size: 48, color: active ? const Color(0xFF001B44) : Colors.grey),
-        const SizedBox(height: 12),
-        Text(active ? 'Viaje en curso' : 'Sin viaje iniciado', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: active ? const Color(0xFF001B44) : const Color(0xFF434750), fontFamily: 'Inter')),
-        if (active) ...[
-          const SizedBox(height: 4),
-          const Text('Ruta A - Centro Histórico', style: TextStyle(fontSize: 14, color: Color(0xFF434750), fontFamily: 'Inter')),
-          const SizedBox(height: 4),
-          const Text('Iniciado hace 32 min', style: TextStyle(fontSize: 13, color: Color(0xFF434750), fontFamily: 'Inter')),
-        ],
-        const SizedBox(height: 16),
-        SizedBox(width: double.infinity, child: ElevatedButton(
-          onPressed: onToggle,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: active ? const Color(0xFFBA1A1A) : const Color(0xFF001B44),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: Text(active ? 'Finalizar viaje' : 'Iniciar viaje', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Inter')),
-        )),
-      ]),
-    );
-  }
-}
-
-class _DaySummary extends StatelessWidget {
-  final int trips, passengers;
-  const _DaySummary({required this.trips, required this.passengers});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: const Color(0xFF001B44), borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x33002F6C), blurRadius: 12, offset: Offset(0, 4))]),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-        _SummaryItem(value: '$trips', label: 'Viajes hoy', color: const Color(0xFFFED000)),
-        Container(width: 1, height: 40, color: Colors.white24),
-        _SummaryItem(value: '$passengers', label: 'Pasajeros', color: Colors.white),
       ]),
     );
   }
@@ -120,10 +77,6 @@ class _QuickCard extends StatelessWidget {
   const _QuickCard({required this.icon, required this.title, required this.subtitle, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 8)]),
-      child: ListTile(leading: Icon(icon, color: const Color(0xFF001B44)), title: Text(title, style: const TextStyle(fontSize: 15, color: Color(0xFF001B44), fontFamily: 'Inter')), subtitle: Text(subtitle, style: const TextStyle(fontSize: 13, color: Color(0xFF434750), fontFamily: 'Inter')), trailing: const Icon(Icons.chevron_right, color: Color(0xFF434750)), onTap: onTap),
-    );
+    return Container(margin: const EdgeInsets.only(bottom: 8), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 8)]), child: ListTile(leading: Icon(icon, color: const Color(0xFF001B44)), title: Text(title, style: const TextStyle(fontSize: 15, color: Color(0xFF001B44), fontFamily: 'Inter')), subtitle: Text(subtitle, style: const TextStyle(fontSize: 13, color: Color(0xFF434750), fontFamily: 'Inter')), trailing: const Icon(Icons.chevron_right, color: Color(0xFF434750)), onTap: onTap));
   }
 }

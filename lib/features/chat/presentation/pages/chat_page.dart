@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-final chatDemoProvider = StateProvider<List<Map<String, String>>>((ref) => [
-  {'sender': 'Conductor', 'text': 'Buenos días, reportando novedades en la ruta.', 'time': '10:30'},
-  {'sender': 'Cooperativa', 'text': 'Recibido. ¿Algún desvío?', 'time': '10:31'},
-  {'sender': 'Conductor', 'text': 'Sí, hay obras en Jr. de la Unión. Voy por ruta alterna.', 'time': '10:32'},
-  {'sender': 'Cooperativa', 'text': 'Entendido. Actualizamos la ruta en el sistema.', 'time': '10:33'},
-]);
+import '../../../../features/chat/presentation/providers/chat_provider.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String roomId;
@@ -16,71 +10,28 @@ class ChatPage extends ConsumerStatefulWidget {
 }
 
 class _ChatPageState extends ConsumerState<ChatPage> {
-  final _msgCtrl = TextEditingController();
-
-  @override
-  void dispose() { _msgCtrl.dispose(); super.dispose(); }
+  final _ctrl = TextEditingController();
+  @override void dispose() { _ctrl.dispose(); super.dispose(); }
 
   void _send() {
-    if (_msgCtrl.text.trim().isEmpty) return;
-    const user = 'Tú';
-    ref.read(chatDemoProvider.notifier).state = [
-      ...ref.read(chatDemoProvider),
-      {'sender': user, 'text': _msgCtrl.text.trim(), 'time': '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}'},
-    ];
-    _msgCtrl.clear();
+    final t = _ctrl.text.trim();
+    if (t.isEmpty) return;
+    ref.read(sendMessageAction(widget.roomId))(t);
+    _ctrl.clear();
   }
 
   @override
   Widget build(BuildContext context) {
-    final messages = ref.watch(chatDemoProvider);
-
+    final msgs = ref.watch(messagesProvider(widget.roomId));
     return Scaffold(
-      appBar: AppBar(title: Text('Soporte - ${widget.roomId}')),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              reverse: false,
-              itemBuilder: (_, i) {
-                final m = messages[i];
-                final isMe = m['sender'] == 'Tú';
-                return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isMe ? const Color(0xFF001B44) : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(m['sender']!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isMe ? Colors.white70 : Colors.grey[600])),
-                        const SizedBox(height: 4),
-                        Text(m['text']!, style: TextStyle(color: isMe ? Colors.white : Colors.black87)),
-                        const SizedBox(height: 2),
-                        Text(m['time']!, style: TextStyle(fontSize: 10, color: isMe ? Colors.white54 : Colors.grey)),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Row(children: [
-              Expanded(child: TextField(controller: _msgCtrl, decoration: const InputDecoration(hintText: 'Escribe un mensaje...', border: OutlineInputBorder()), onSubmitted: (_) => _send())),
-              const SizedBox(width: 8),
-              IconButton(onPressed: _send, icon: const Icon(Icons.send), color: const Color(0xFF001B44)),
-            ]),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text('Chat - ${widget.roomId}'), backgroundColor: const Color(0xFFF8F9FA), elevation: 0),
+      body: msgs.when(loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF001B44))), error: (_, __) => const Center(child: Text('Error')), data: (messages) => Column(children: [
+        Expanded(child: ListView.builder(padding: const EdgeInsets.all(16), itemCount: messages.length, itemBuilder: (_, i) {
+          final m = messages[i]; final me = m.senderId == 'current_user';
+          return Align(alignment: me ? Alignment.centerRight : Alignment.centerLeft, child: Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), constraints: const BoxConstraints(maxWidth: 280), decoration: BoxDecoration(color: me ? const Color(0xFF001B44) : Colors.grey[200], borderRadius: BorderRadius.circular(14)), child: Text(m.content, style: TextStyle(fontSize: 15, color: me ? Colors.white : Colors.black87, fontFamily: 'Inter'))));
+        })),
+        Padding(padding: const EdgeInsets.all(12), child: Row(children: [Expanded(child: TextField(controller: _ctrl, onSubmitted: (_) => _send(), decoration: const InputDecoration(hintText: 'Escribe...', border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(24)), borderSide: BorderSide.none), filled: true, fillColor: Color(0xFFF8F9FA), contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10)))), const SizedBox(width: 8), Container(decoration: BoxDecoration(color: const Color(0xFF001B44), borderRadius: BorderRadius.circular(24)), child: IconButton(onPressed: _send, icon: const Icon(Icons.send, size: 18, color: Colors.white), constraints: const BoxConstraints(minWidth: 44, minHeight: 44)))])),
+      ])),
     );
   }
 }

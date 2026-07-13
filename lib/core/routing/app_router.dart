@@ -29,7 +29,6 @@ import '../../features/cooperativa/presentation/pages/coop_scaffold.dart';
 import '../../features/cooperativa/presentation/pages/fleet_dashboard_page.dart';
 import '../../features/cooperativa/presentation/pages/reports_page.dart';
 import '../../features/cooperativa/presentation/pages/routes_management_page.dart';
-import '../../features/cooperativa/presentation/pages/stop_management_page.dart';
 import '../../features/usuario/presentation/pages/alerts_page.dart';
 import '../../features/usuario/presentation/pages/u_scaffold.dart';
 import '../../features/usuario/presentation/pages/favorites_page.dart';

@@ -20,6 +20,19 @@ import '../../features/cooperativa/domain/repositories/fleet_repository.dart';
 import '../../features/cooperativa/presentation/providers/fleet_provider.dart';
 import '../../features/admin_municipal/domain/repositories/network_monitor_repository.dart';
 import '../../features/admin_municipal/presentation/providers/system_alerts_provider.dart';
+import '../../features/usuario/data/datasources/bus_tracking_remote_datasource.dart';
+import '../../features/usuario/data/datasources/eta_remote_datasource.dart';
+import '../../features/usuario/data/repositories/bus_tracking_repository_impl.dart';
+import '../../features/usuario/data/repositories/eta_repository_impl.dart';
+import '../../features/conductor/data/datasources/obd_telemetry_datasource.dart';
+import '../../features/conductor/data/datasources/stops_remote_datasource.dart';
+import '../../features/conductor/data/datasources/trip_remote_datasource.dart';
+import '../../features/conductor/data/repositories/stops_repository_impl.dart';
+import '../../features/conductor/data/repositories/trip_repository_impl.dart';
+import '../../features/cooperativa/data/datasources/fleet_remote_datasource.dart';
+import '../../features/cooperativa/data/repositories/fleet_repository_impl.dart';
+import '../../features/admin_municipal/data/datasources/network_monitor_remote_datasource.dart';
+import '../../features/admin_municipal/data/repositories/network_monitor_repository_impl.dart';
 import '../config/env.dart';
 import '../network/connectivity_service.dart';
 import '../network/mqtt_service.dart';
@@ -54,6 +67,8 @@ Future<void> configureDependencies() async {
   _registerAuthDependencies();
   if (Env.enableMockAuth) {
     _registerMockDependencies();
+  } else {
+    _registerRealFeatureDependencies();
   }
   _configureRiverpodOverrides();
 }
@@ -118,6 +133,55 @@ void _registerMockDependencies() {
   );
 }
 
+void _registerRealFeatureDependencies() {
+  final client = sl<SupabaseClient>();
+
+  sl.registerLazySingleton<BusTrackingRemoteDataSource>(
+    () => BusTrackingRemoteDataSourceImpl(client),
+  );
+  sl.registerLazySingleton<BusTrackingRepository>(
+    () => BusTrackingRepositoryImpl(sl<BusTrackingRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton<EtaRemoteDataSource>(
+    () => EtaRemoteDataSourceImpl(client),
+  );
+  sl.registerLazySingleton<EtaRepository>(
+    () => EtaRepositoryImpl(sl<EtaRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton<TripRemoteDataSource>(
+    () => TripRemoteDataSourceImpl(client),
+  );
+  sl.registerLazySingleton<ObdTelemetryDataSource>(
+    () => ObdTelemetryDataSourceImpl(client),
+  );
+  sl.registerLazySingleton<TripRepository>(
+    () => TripRepositoryImpl(sl<TripRemoteDataSource>(), sl<ObdTelemetryDataSource>()),
+  );
+
+  sl.registerLazySingleton<StopsRemoteDataSource>(
+    () => StopsRemoteDataSourceImpl(client),
+  );
+  sl.registerLazySingleton<StopsRepository>(
+    () => StopsRepositoryImpl(sl<StopsRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton<FleetRemoteDataSource>(
+    () => FleetRemoteDataSourceImpl(client),
+  );
+  sl.registerLazySingleton<FleetRepository>(
+    () => FleetRepositoryImpl(sl<FleetRemoteDataSource>()),
+  );
+
+  sl.registerLazySingleton<NetworkMonitorRemoteDataSource>(
+    () => NetworkMonitorRemoteDataSourceImpl(client),
+  );
+  sl.registerLazySingleton<NetworkMonitorRepository>(
+    () => NetworkMonitorRepositoryImpl(sl<NetworkMonitorRemoteDataSource>()),
+  );
+}
+
 void _configureRiverpodOverrides() {
   _connectivityOverride = connectivityServiceProvider.overrideWith(
     (_) => sl<ConnectivityService>(),
@@ -153,26 +217,24 @@ void _configureRiverpodOverrides() {
     (_) => sl<AuthSessionManager>(),
   );
 
-  if (Env.enableMockAuth) {
-    _busTrackingOverride = busTrackingRepositoryProvider.overrideWith(
-      (_) => sl<BusTrackingRepository>(),
-    );
-    _etaOverride = etaRepositoryProvider.overrideWith(
-      (_) => sl<EtaRepository>(),
-    );
-    _tripOverride = tripRepositoryProvider.overrideWith(
-      (_) => sl<TripRepository>(),
-    );
-    _stopsOverride = stopsRepositoryProvider.overrideWith(
-      (_) => sl<StopsRepository>(),
-    );
-    _fleetOverride = fleetRepositoryProvider.overrideWith(
-      (_) => sl<FleetRepository>(),
-    );
-    _networkMonitorOverride = networkMonitorRepositoryProvider.overrideWith(
-      (_) => sl<NetworkMonitorRepository>(),
-    );
-  }
+  _busTrackingOverride = busTrackingRepositoryProvider.overrideWith(
+    (_) => sl<BusTrackingRepository>(),
+  );
+  _etaOverride = etaRepositoryProvider.overrideWith(
+    (_) => sl<EtaRepository>(),
+  );
+  _tripOverride = tripRepositoryProvider.overrideWith(
+    (_) => sl<TripRepository>(),
+  );
+  _stopsOverride = stopsRepositoryProvider.overrideWith(
+    (_) => sl<StopsRepository>(),
+  );
+  _fleetOverride = fleetRepositoryProvider.overrideWith(
+    (_) => sl<FleetRepository>(),
+  );
+  _networkMonitorOverride = networkMonitorRepositoryProvider.overrideWith(
+    (_) => sl<NetworkMonitorRepository>(),
+  );
 }
 
 void disposeDependencies() {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'municipal_overview.dart';
+import 'municipal_overview_page.dart';
 import 'admin_incidents.dart';
 import 'admin_analytics.dart';
 import 'cooperativas_table.dart';
@@ -19,7 +19,7 @@ class _AdminScaffoldState extends State<AdminScaffold> {
   late int _index = widget.initialIndex;
 
   static final _pages = [
-    const MunicipalOverview(), const AdminIncidents(), const AdminAnalytics(),
+    const MunicipalOverviewPage(), const AdminIncidents(), const AdminAnalytics(),
     const CooperativasTable(), const PremiumTable(),
   ];
 
