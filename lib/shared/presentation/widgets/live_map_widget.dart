@@ -30,6 +30,15 @@ class LiveMapWidget extends StatefulWidget {
   /// Callback al seleccionar un bus.
   final void Function(String busId)? onBusTapped;
 
+  /// Polilíneas adicionales (rutas favoritas, etc.).
+  final List<Polyline> extraPolylines;
+
+  /// Marcadores adicionales.
+  final List<Marker> extraMarkers;
+
+  /// Callback al tocar el mapa.
+  final void Function(LatLng)? onMapTapped;
+
   const LiveMapWidget({
     super.key,
     required this.initialPosition,
@@ -38,6 +47,9 @@ class LiveMapWidget extends StatefulWidget {
     this.stops = const [],
     this.onStopTapped,
     this.onBusTapped,
+    this.extraPolylines = const [],
+    this.extraMarkers = const [],
+    this.onMapTapped,
   });
 
   @override
@@ -163,14 +175,17 @@ class _LiveMapWidgetState extends State<LiveMapWidget>
       );
     }
 
+    polylines.addAll(widget.extraPolylines);
+
     return GoogleMap(
       initialCameraPosition: widget.initialPosition,
-      markers: _markers,
+      markers: {..._markers, ...widget.extraMarkers},
       polylines: polylines,
       onMapCreated: (controller) {
         _mapController = controller;
         _refreshBusPositions();
       },
+      onTap: widget.onMapTapped,
       myLocationEnabled: true,
       myLocationButtonEnabled: true,
       zoomControlsEnabled: true,

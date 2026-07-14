@@ -12,6 +12,16 @@ final conversationsProvider = FutureProvider<List<ChatConversation>>((ref) async
   return result.fold((_) => [], (list) => list);
 });
 
+final conversationsStreamProvider = StreamProvider<List<ChatConversation>>((ref) {
+  final repo = ref.watch(chatRepositoryProvider);
+  return repo.watchConversations().where((e) => e.isRight()).map((e) => e.fold((_) => [], (list) => list));
+});
+
+final unreadCountProvider = Provider<int>((ref) {
+  final convs = ref.watch(conversationsStreamProvider).valueOrNull ?? [];
+  return convs.fold(0, (sum, c) => sum + c.unreadCount);
+});
+
 Stream<List<ChatMessage>> _messageStream(ChatRepository repo, String roomId) async* {
   final initial = await repo.getMessages(roomId);
   final allMessages = initial.fold((_) => <ChatMessage>[], (msgs) => List<ChatMessage>.from(msgs));
@@ -19,7 +29,12 @@ Stream<List<ChatMessage>> _messageStream(ChatRepository repo, String roomId) asy
 
   await for (final either in repo.watchMessages(roomId)) {
     either.fold((_) {}, (msg) {
-      allMessages.add(msg);
+      final idx = allMessages.indexWhere((m) => m.id == msg.id);
+      if (idx >= 0) {
+        allMessages[idx] = msg;
+      } else {
+        allMessages.add(msg);
+      }
     });
     yield List<ChatMessage>.from(allMessages);
   }
@@ -33,5 +48,11 @@ final messagesProvider = StreamProvider.family<List<ChatMessage>, String>((ref, 
 final sendMessageAction = Provider.family<void Function(String), String>((ref, roomId) {
   return (String content) {
     ref.read(chatRepositoryProvider).sendMessage(roomId: roomId, content: content);
+  };
+});
+
+final markAsReadAction = Provider<void Function(String)>((ref) {
+  return (String msgId) {
+    ref.read(chatRepositoryProvider).markAsRead(msgId);
   };
 });

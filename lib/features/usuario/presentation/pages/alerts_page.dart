@@ -21,6 +21,7 @@ class AlertsPage extends ConsumerWidget {
           ]));
           return ListView.builder(padding: const EdgeInsets.all(16), itemCount: alerts.length, prototypeItem: const SizedBox(height: 100), itemBuilder: (_, i) {
             final a = alerts[i];
+            if (a.scope != 'route' && a.scope != 'stop' && a.scope != 'system') return const SizedBox.shrink();
             final color = a.severity == 'high' ? const Color(0xFFBA1A1A) : a.severity == 'medium' ? const Color(0xFFFED000) : Colors.blue;
             return Container(margin: const EdgeInsets.only(bottom: 12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border(left: BorderSide(color: color, width: 4)), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 8)]), padding: const EdgeInsets.all(16), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Container(width: 40, height: 40, decoration: BoxDecoration(color: a.isResolved ? Colors.green.withAlpha(20) : color.withAlpha(20), borderRadius: BorderRadius.circular(10)), child: Icon(a.isResolved ? Icons.check_circle : Icons.warning_amber, color: a.isResolved ? Colors.green : color, size: 20)),

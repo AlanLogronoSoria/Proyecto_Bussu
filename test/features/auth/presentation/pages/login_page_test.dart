@@ -54,13 +54,13 @@ void main() {
     testWidgets('debe tener link a registro', (tester) async {
       await tester.pumpWidget(createLoginPage(mockRepo, mockBinding));
       await tester.pumpAndSettle();
-      expect(find.text('¿No tienes cuenta? Regístrate'), findsOneWidget);
+      expect(find.text('Crear cuenta'), findsOneWidget);
     });
 
     testWidgets('debe tener link a recuperar password', (tester) async {
       await tester.pumpWidget(createLoginPage(mockRepo, mockBinding));
       await tester.pumpAndSettle();
-      expect(find.text('¿Olvidaste tu contraseña?'), findsOneWidget);
+      expect(find.text('Recuperar acceso'), findsOneWidget);
     });
   });
 }

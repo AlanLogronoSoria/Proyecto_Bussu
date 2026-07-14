@@ -34,7 +34,7 @@ import '../../features/usuario/presentation/pages/u_scaffold.dart';
 import '../../features/usuario/presentation/pages/favorites_page.dart';
 import '../../features/usuario/presentation/pages/map_page.dart';
 import '../../features/usuario/presentation/pages/premium_upgrade_page.dart';
-import '../../features/usuario/presentation/pages/profile_page.dart';
+import '../../shared/presentation/pages/unified_profile_page.dart';
 import '../../features/usuario/presentation/pages/routes_page.dart';
 import '../../features/usuario/presentation/pages/tickets_page.dart';
 import '../../features/usuario/presentation/pages/trip_history_page.dart';
@@ -131,7 +131,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/usuario/profile',
         name: 'usuario-profile',
-        builder: (context, state) => const ProfilePage(),
+        builder: (context, state) => const UnifiedProfilePage(),
       ),
       GoRoute(
         path: '/conductor',

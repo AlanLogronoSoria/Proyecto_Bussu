@@ -1,117 +1,101 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/security/output_sanitizer.dart';
-import '../../../../core/utils/validators.dart';
-import '../../domain/repositories/network_monitor_repository.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/constants/app_roles.dart';
 import '../providers/system_alerts_provider.dart';
 
-/// CRUD de cooperativas para el administrador municipal.
 class CooperativasCrudPage extends ConsumerStatefulWidget {
   const CooperativasCrudPage({super.key});
-
   @override
-  ConsumerState<CooperativasCrudPage> createState() =>
-      _CooperativasCrudPageState();
+  ConsumerState<CooperativasCrudPage> createState() => _CooperativasCrudPageState();
 }
 
 class _CooperativasCrudPageState extends ConsumerState<CooperativasCrudPage> {
-  final _nameController = TextEditingController();
-  final _rucController = TextEditingController();
+  late final TextEditingController _nombre, _ruc, _buses, _correo, _password;
+  bool _estado = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _nombre = TextEditingController(); _ruc = TextEditingController(); _buses = TextEditingController();
+    _correo = TextEditingController(); _password = TextEditingController();
+  }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _rucController.dispose();
+    _nombre.dispose(); _ruc.dispose(); _buses.dispose(); _correo.dispose(); _password.dispose();
     super.dispose();
+  }
+
+  void _openCreate() {
+    _nombre.clear(); _ruc.clear(); _buses.clear(); _correo.clear(); _password.clear();
+    _estado = true;
+    showDialog(context: context, builder: (_) => AlertDialog(
+      title: const Text('Nueva Cooperativa', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: Color(0xFF001B44))),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        _field(_nombre, 'Nombre'), const SizedBox(height: 10),
+        _field(_ruc, 'RUC'), const SizedBox(height: 10),
+        _field(_buses, 'Número de buses', keyboardType: TextInputType.number), const SizedBox(height: 10),
+        _field(_correo, 'Correo', keyboardType: TextInputType.emailAddress), const SizedBox(height: 10),
+        _field(_password, 'Contraseña', obscure: true),
+        const SizedBox(height: 12),
+        SwitchListTile(title: const Text('Activo', style: TextStyle(fontFamily: 'Inter')), value: _estado, onChanged: (v) => setState(() => _estado = v), dense: true, contentPadding: EdgeInsets.zero, activeColor: const Color(0xFF001B44)),
+      ])),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        ElevatedButton(onPressed: () {
+          final fn = _nombre.text.trim();
+          if (fn.isEmpty || _correo.text.trim().isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nombre y correo son requeridos'), backgroundColor: Color(0xFFBA1A1A)));
+            return;
+          }
+          ref.read(authNotifierProvider.notifier).register(email: _correo.text.trim(), password: _password.text.trim(), confirmPassword: _password.text.trim(), fullName: fn, role: UserRole.cooperativaAdmin);
+          Navigator.pop(context);
+          ref.invalidate(cooperativasStatusProvider);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cooperativa registrada: profiles + auth creados'), backgroundColor: Color(0xFF001B44)));
+        }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001B44), foregroundColor: Colors.white), child: const Text('Registrar')),
+      ],
+    ));
+  }
+
+  Widget _field(TextEditingController ctrl, String label, {TextInputType keyboardType = TextInputType.text, bool obscure = false}) {
+    return TextField(controller: ctrl, obscureText: obscure, keyboardType: keyboardType, decoration: InputDecoration(labelText: label, labelStyle: const TextStyle(fontFamily: 'Inter'), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE0E0E0))), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF001B44))), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final statusAsync = ref.watch(cooperativasStatusProvider);
+    final coopStatus = ref.watch(cooperativasStatusProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Cooperativas')),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateDialog(),
-        child: const Icon(Icons.add),
-      ),
-      body: statusAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (cooperativas) => ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: cooperativas.length,
-          prototypeItem: const Card(child: ListTile(title: Text(' '))),
-          itemBuilder: (_, i) {
-            final c = cooperativas[i];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                title: Text(c.name),
-                subtitle: c.ruc != null ? Text('RUC: ${c.ruc}') : null,
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${c.fleetActivityPct.round()}% activo',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      onPressed: () =>
-                          ref.read(networkMonitorRepositoryProvider).deleteCooperativa(c.id),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  void _showCreateDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Nueva Cooperativa'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Nombre'),
-            ),
-            TextField(
-              controller: _rucController,
-              decoration: const InputDecoration(labelText: 'RUC'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = OutputSanitizer.sanitizeName(_nameController.text);
-              final ruc = OutputSanitizer.sanitizeRuc(_rucController.text);
-              final nameError = Validators.validateRequired(name, 'Nombre');
-              if (nameError != null) return;
-              ref.read(networkMonitorRepositoryProvider).createCooperativa({
-                'name': name,
-                'ruc': ruc,
-              });
-              Navigator.pop(context);
-              ref.invalidate(cooperativasStatusProvider);
-            },
-            child: const Text('Crear'),
-          ),
-        ],
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(title: const Text('Cooperativas', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600, color: Color(0xFF001B44))), backgroundColor: const Color(0xFFF8F9FA), elevation: 0),
+      floatingActionButton: FloatingActionButton(onPressed: _openCreate, backgroundColor: const Color(0xFF001B44), child: const Icon(Icons.add, color: Colors.white)),
+      body: coopStatus.when(
+        loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF001B44))),
+        error: (_, __) => const Center(child: Text('Error al cargar')),
+        data: (coops) => ListView.builder(padding: const EdgeInsets.all(16), itemCount: coops.length, prototypeItem: const SizedBox(height: 80), itemBuilder: (_, i) {
+          final c = coops[i];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 4)]),
+            child: Row(children: [
+              CircleAvatar(radius: 28, backgroundColor: const Color(0xFF001B44), child: Text(c.name.isNotEmpty ? c.name[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontFamily: 'Inter'))),
+              const SizedBox(width: 14),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(c.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF001B44), fontFamily: 'Inter')),
+                const SizedBox(height: 2),
+                Row(children: [Text(c.ruc ?? '', style: const TextStyle(fontSize: 13, color: Color(0xFF434750), fontFamily: 'Inter')), const SizedBox(width: 12), Text('Buses: ${c.activeBuses}/${c.totalBuses}', style: const TextStyle(fontSize: 13, color: Color(0xFF434750), fontFamily: 'Inter'))]),
+                Row(children: [Text('${c.totalDrivers} conductores', style: const TextStyle(fontSize: 12, color: Color(0xFF434750), fontFamily: 'Inter')), const SizedBox(width: 12), Text('Ocup: ${c.averageOccupancy.toStringAsFixed(0)}%', style: const TextStyle(fontSize: 12, color: Color(0xFF434750), fontFamily: 'Inter'))]),
+              ])),
+              Column(children: [
+                Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: (c.activeBuses > 0 ? Colors.green : Colors.grey).withAlpha(20), borderRadius: BorderRadius.circular(8)), child: Text(c.activeBuses > 0 ? 'Activo' : 'Inactivo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: c.activeBuses > 0 ? Colors.green.shade700 : const Color(0xFF434750)))),
+                const SizedBox(height: 6),
+                Text('${c.fleetActivityPct.toStringAsFixed(0)}% activ.', style: const TextStyle(fontSize: 11, color: Color(0xFF434750), fontFamily: 'Inter')),
+              ]),
+              IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFBA1A1A)), onPressed: () {}),
+            ]),
+          );
+        }),
       ),
     );
   }

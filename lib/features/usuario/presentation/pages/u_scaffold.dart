@@ -3,7 +3,7 @@ import 'map_page.dart';
 import 'routes_page.dart';
 import 'tickets_page.dart';
 import 'alerts_page.dart';
-import 'profile_page.dart';
+import '../../../../shared/presentation/pages/unified_profile_page.dart';
 
 class UScaffold extends StatefulWidget {
   final int initialIndex;
@@ -15,7 +15,7 @@ class UScaffold extends StatefulWidget {
 class _UScaffoldState extends State<UScaffold> {
   late int _index = widget.initialIndex;
 
-  static const _pages = [MapPage(), RoutesPage(), TicketsPage(), AlertsPage(), ProfilePage()];
+  static const _pages = [MapPage(), RoutesPage(), TicketsPage(), AlertsPage(), UnifiedProfilePage()];
 
   @override
   Widget build(BuildContext context) {
