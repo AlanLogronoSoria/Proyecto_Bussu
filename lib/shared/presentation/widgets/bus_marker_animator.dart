@@ -1,149 +1,109 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../core/maps/marker_service.dart';
 
-/// Posición animada de un bus en el mapa.
-///
-/// Interpola la posición del marcador entre dos actualizaciones
-/// consecutivas para suavizar el movimiento visual.
 class BusMarkerAnimator {
-  BusMarkerAnimator({
-    this.animationDuration = const Duration(seconds: 4),
-  });
+  final MarkerService _markerService;
 
-  /// Duración de la animación de interpolación.
-  final Duration animationDuration;
+  static const double _minMoveMeters = 0.5;
+  static const Duration _fastAnim = Duration(milliseconds: 400);
+  static const Duration _mediumAnim = Duration(milliseconds: 700);
+  static const Duration _slowAnim = Duration(milliseconds: 1000);
 
-  final Map<String, _AnimatedBus> _buses = {};
+  final Map<String, _BusState> _states = {};
+  final Map<String, _AnimSegment> _segments = {};
+  int _frameCount = 0;
 
-  /// Agrega o actualiza la posición de un bus.
-  ///
-  /// Si ya existe, inicia la animación desde la posición actual
-  /// hacia la nueva [position].
-  void updateBusPosition(
-    String busId,
-    LatLng position,
-    double heading, {
-    double? occupancyPct,
-  }) {
-    if (_buses.containsKey(busId)) {
-      final bus = _buses[busId]!;
-      bus.targetPosition = position;
-      bus.heading = heading;
-      bus.occupancyPct = occupancyPct ?? bus.occupancyPct;
-    } else {
-      _buses[busId] = _AnimatedBus(
-        position: position,
-        heading: heading,
-        occupancyPct: occupancyPct ?? 0,
-      );
+  BusMarkerAnimator(this._markerService);
+
+  Duration get animationDuration {
+    var total = 0.0;
+    var count = 0;
+    for (final s in _segments.values) { total += s.speedKmh; count++; }
+    final avg = count > 0 ? total / count : 20;
+    return avg > 40 ? _fastAnim : avg > 20 ? _mediumAnim : _slowAnim;
+  }
+
+  void updateBusPosition(String busId, LatLng pos, double heading, {double occupancyPct = 0, double speedKmh = 0}) {
+    final cur = _states[busId];
+    if (cur == null) {
+      _states[busId] = _BusState(interpolatedPosition: pos, heading: heading, occupancyPct: occupancyPct);
+      _segments[busId] = _AnimSegment(start: pos, end: pos, speedKmh: speedKmh);
+      return;
     }
+    final dist = _haversine(cur.interpolatedPosition, pos);
+    if (dist < _minMoveMeters && speedKmh < 2) return;
+    _segments[busId] = _AnimSegment(start: cur.interpolatedPosition, end: pos, speedKmh: speedKmh);
+    _states[busId] = _BusState(interpolatedPosition: cur.interpolatedPosition, heading: heading, occupancyPct: occupancyPct);
   }
 
-  /// Obtiene la posición interpolada actual de un bus.
-  ///
-  /// Retorna `null` si el bus no existe.
-  LatLng? getBusPosition(String busId) {
-    return _buses[busId]?.position;
-  }
-
-  /// Obtiene el heading actual de un bus.
-  double getBusHeading(String busId) {
-    return _buses[busId]?.heading ?? 0;
-  }
-
-  /// Obtiene el porcentaje de ocupación de un bus.
-  double getBusOccupancy(String busId) {
-    return _buses[busId]?.occupancyPct ?? 0;
-  }
-
-  /// Lista de IDs de buses activos.
-  Iterable<String> get activeBusIds => _buses.keys;
-
-  /// Elimina un bus del animador (cuando deja de transmitir).
-  void removeBus(String busId) {
-    _buses.remove(busId);
-  }
-
-  /// Elimina todos los buses.
-  void clear() {
-    _buses.clear();
-  }
-
-  /// Tick de animación. Debe llamarse desde un [Ticker] o [AnimationController].
-  ///
-  /// [progress] debe estar entre 0.0 y 1.0.
   void tick(double progress) {
-    for (final bus in _buses.values) {
-      if (bus.targetPosition != null) {
-        final t = Curves.easeInOut.transform(progress);
-        bus.currentPosition = LatLng(
-          bus.currentPosition.latitude +
-              (bus.targetPosition!.latitude - bus.currentPosition.latitude) * t,
-          bus.currentPosition.longitude +
-              (bus.targetPosition!.longitude - bus.currentPosition.longitude) *
-                  t,
-        );
-      }
+    for (final entry in _states.entries) {
+      final busId = entry.key;
+      final seg = _segments[busId];
+      if (seg == null) continue;
+      final p = _ease(progress, seg.speedKmh);
+      final lat = seg.start.latitude + (seg.end.latitude - seg.start.latitude) * p;
+      final lng = seg.start.longitude + (seg.end.longitude - seg.start.longitude) * p;
+      _states[busId] = _states[busId]!.copyWith(interpolatedPosition: LatLng(lat, lng));
     }
+    _frameCount++;
   }
 
-  /// Marca el frame de animación como completado.
-  /// El target se convierte en la posición actual.
-  void commitFrame() {
-    for (final bus in _buses.values) {
-      if (bus.targetPosition != null) {
-        bus.currentPosition = bus.targetPosition!;
-        bus.targetPosition = null;
-      }
+  double _ease(double t, double speed) {
+    if (speed > 40) {
+      final easeOut = 1 - (1 - t) * (1 - t) * (1 - t);
+      return easeOut;
     }
+    if (speed > 10) return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) * (-2 * t + 2) * (-2 * t + 2) * 0.5;
+    return t * t;
   }
 
-  /// Crea un marcador de Google Maps para un bus.
   Marker createMarker(String busId) {
-    final bus = _buses[busId];
-    if (bus == null) {
-      return Marker(markerId: MarkerId(busId));
-    }
-
-    final occupancy = bus.occupancyPct;
-    final hue = _occupancyColor(occupancy);
-
-    return Marker(
-      markerId: MarkerId(busId),
-      position: bus.position,
-      rotation: bus.heading,
-      icon: BitmapDescriptor.defaultMarkerWithHue(hue),
-      infoWindow: InfoWindow(
-        title: 'Bus $busId',
-        snippet: '${occupancy.round()}% ocupado',
-      ),
-      onTap: () {
-        // Callback manejado por el widget
-      },
-    );
+    final s = _states[busId];
+    if (s == null) return Marker(point: const LatLng(0, 0), child: const SizedBox.shrink());
+    return _markerService.createBusMarker(id: busId, point: s.interpolatedPosition, heading: s.heading, occupancyPct: s.occupancyPct);
   }
 
-  double _occupancyColor(double pct) {
-    if (pct < 40) return BitmapDescriptor.hueGreen;
-    if (pct < 75) return BitmapDescriptor.hueYellow;
-    return BitmapDescriptor.hueRed;
+  Iterable<String> get activeBusIds => _states.keys;
+  bool get hasActiveBuses => _states.isNotEmpty;
+  int get frameCount => _frameCount;
+
+  void removeBus(String busId) { _states.remove(busId); _segments.remove(busId); }
+  void clear() { _states.clear(); _segments.clear(); _frameCount = 0; }
+
+  double _haversine(LatLng a, LatLng b) {
+    const r = 6371000.0;
+    final dlat = (b.latitude - a.latitude) * 0.0174533;
+    final dlng = (b.longitude - a.longitude) * 0.0174533;
+    final aa = dlat * dlat / 4 + (a.latitude * 0.0174533).clamp(-1.0, 1.0).let((c) => c) * (b.latitude * 0.0174533).clamp(-1.0, 1.0).let((c) => c) * dlng * dlng / 4;
+    return r * 2 * asinSafe(aa.clamp(0.0, 1.0));
+  }
+
+  double asinSafe(double x) {
+    double s = x, t = x;
+    for (int i = 3; i < 10; i += 2) { t *= x * x * (i - 2) / i; s += t; }
+    return s;
   }
 }
 
-class _AnimatedBus {
-  LatLng currentPosition;
-  LatLng? targetPosition;
-  double heading;
-  double occupancyPct;
+class _BusState {
+  final LatLng interpolatedPosition;
+  final double heading;
+  final double occupancyPct;
+  _BusState({required this.interpolatedPosition, this.heading = 0, this.occupancyPct = 0});
+  _BusState copyWith({LatLng? interpolatedPosition, double? heading, double? occupancyPct}) {
+    return _BusState(interpolatedPosition: interpolatedPosition ?? this.interpolatedPosition, heading: heading ?? this.heading, occupancyPct: occupancyPct ?? this.occupancyPct);
+  }
+}
 
-  _AnimatedBus({
-    required LatLng position,
-    required this.heading,
-    required this.occupancyPct,
-  })  : currentPosition = position,
-        targetPosition = null;
+class _AnimSegment {
+  final LatLng start, end;
+  final double speedKmh;
+  _AnimSegment({required this.start, required this.end, required this.speedKmh});
+}
 
-  LatLng get position => currentPosition;
+extension _NumExt on num {
+  double let(double Function(double) f) => f(toDouble());
 }

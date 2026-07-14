@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../../core/maps/marker_service.dart';
 import '../../../../shared/domain/entities/route_entity.dart';
 import '../../../../shared/domain/entities/stop_entity.dart';
 import '../../../../shared/presentation/widgets/live_map_widget.dart';
+import '../../../admin_municipal/presentation/providers/system_alerts_provider.dart';
+import '../../../admin_municipal/domain/entities/system_alert.dart';
 import '../providers/trip_provider.dart';
 import 'driver_dashboard_page.dart';
 
@@ -17,6 +21,8 @@ class _ActiveTripPageState extends ConsumerState<ActiveTripPage> {
   int _passengerCount = 0;
   bool _routeStarted = false;
   LatLng? _stopRequestPin;
+  final _reasonCtrl = TextEditingController();
+  final MarkerService _markerService = const MarkerService();
 
   final RouteEntity _mockRoute = RouteEntity(
     id: 'route-a', name: 'Ruta A - Centro',
@@ -28,6 +34,9 @@ class _ActiveTripPageState extends ConsumerState<ActiveTripPage> {
     ],
   );
 
+  @override
+  void dispose() { _reasonCtrl.dispose(); super.dispose(); }
+
   void _confirmPassengerChange(int newCount) {
     showDialog(context: context, builder: (_) => AlertDialog(
       title: const Text('Confirmar cambio', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600)),
@@ -37,6 +46,38 @@ class _ActiveTripPageState extends ConsumerState<ActiveTripPage> {
         ElevatedButton(onPressed: () { setState(() => _passengerCount = newCount); Navigator.pop(context); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001B44)), child: const Text('Confirmar')),
       ],
     ));
+  }
+
+  void _sendStopRequest() {
+    if (_stopRequestPin == null) return;
+    _reasonCtrl.clear();
+    showModalBottomSheet(context: context, isScrollControlled: true, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (_) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+      const SizedBox(height: 16),
+      const Text('Solicitar nueva parada', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF001B44), fontFamily: 'Inter')),
+      const SizedBox(height: 12),
+      Row(children: [const Icon(Icons.location_on, size: 18, color: Color(0xFF001B44)), const SizedBox(width: 8), Expanded(child: Text('${_stopRequestPin!.latitude.toStringAsFixed(5)}, ${_stopRequestPin!.longitude.toStringAsFixed(5)}', style: const TextStyle(fontSize: 14, color: Color(0xFF001B44), fontFamily: 'Inter')))]),
+      const SizedBox(height: 16),
+      TextField(controller: _reasonCtrl, maxLines: 3, decoration: InputDecoration(labelText: 'Motivo de la solicitud', labelStyle: const TextStyle(fontFamily: 'Inter'), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF001B44))))),
+      const SizedBox(height: 20),
+      SizedBox(width: double.infinity, child: ElevatedButton(onPressed: () { Navigator.pop(context); final uc = ref.read(requestNewStopUseCaseProvider); uc.execute(driverId: 'current-driver', lat: _stopRequestPin!.latitude, lng: _stopRequestPin!.longitude, reason: _reasonCtrl.text.isNotEmpty ? _reasonCtrl.text : 'Solicitud'); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Solicitud enviada'), backgroundColor: Color(0xFF001B44))); setState(() => _stopRequestPin = null); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001B44), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))), child: const Text('Enviar solicitud', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Inter')))),
+      const SizedBox(height: 12),
+    ])));
+  }
+
+  void _reportIncident() {
+    if (!_routeStarted) return;
+    final incidentCtrl = TextEditingController();
+    showModalBottomSheet(context: context, isScrollControlled: true, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (_) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 20), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+      const SizedBox(height: 16),
+      const Row(children: [Icon(Icons.warning_amber, color: Color(0xFFBA1A1A), size: 22), SizedBox(width: 8), Text('Reportar incidente', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF001B44), fontFamily: 'Inter'))]),
+      const SizedBox(height: 16),
+      TextField(controller: incidentCtrl, maxLines: 3, decoration: InputDecoration(labelText: 'Descripción', labelStyle: const TextStyle(fontFamily: 'Inter'), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF001B44))))),
+      const SizedBox(height: 20),
+      SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: () { Navigator.pop(context); final repo = ref.read(networkMonitorRepositoryProvider); repo.createAlert(SystemAlert(id: '', scope: 'stop', severity: 'medium', title: 'Incidente', description: incidentCtrl.text, createdBy: 'conductor', createdAt: DateTime.now())); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incidente reportado'), backgroundColor: Color(0xFFBA1A1A))); }, icon: const Icon(Icons.send, size: 18), label: const Text('Enviar reporte'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFBA1A1A), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))))),
+      const SizedBox(height: 12),
+    ])));
   }
 
   void _endTrip() {
@@ -50,43 +91,26 @@ class _ActiveTripPageState extends ConsumerState<ActiveTripPage> {
     if (!hasActive) return const DriverDashboardPage();
 
     final extraMarkers = <Marker>[];
-    if (_stopRequestPin != null) {
-      extraMarkers.add(Marker(
-        markerId: const MarkerId('stop_request'),
-        position: _stopRequestPin!,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: const InfoWindow(title: 'Solicitud de parada'),
-      ));
-    }
+    if (_stopRequestPin != null) extraMarkers.add(_markerService.createRequestMarker(id: 'stop_req', point: _stopRequestPin!, title: 'Solicitud'));
 
     return Scaffold(
       body: Stack(children: [
-        LiveMapWidget(
-          initialPosition: const CameraPosition(target: LatLng(-12.0464, -77.0428), zoom: 15),
-          activeRoute: _routeStarted ? _mockRoute : null,
-          stops: _routeStarted ? _mockRoute.stops : [],
-          extraMarkers: extraMarkers,
-          onMapTapped: (pos) { if (_routeStarted) setState(() => _stopRequestPin = pos); },
-        ),
+        LiveMapWidget(initialCenter: const LatLng(-12.0464, -77.0428), initialZoom: 15, activeRoute: _routeStarted ? _mockRoute : null, stops: _routeStarted ? _mockRoute.stops : [], extraMarkers: extraMarkers, onMapTapped: (pos) { if (_routeStarted) setState(() => _stopRequestPin = pos); }),
         Positioned(top: 56, left: 16, right: 16, child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 8)]), child: Row(children: [
           Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: _routeStarted ? const Color(0xFFFED000) : Colors.grey[300]!, borderRadius: BorderRadius.circular(8)), child: Text(_routeStarted ? 'En Ruta' : 'Detenido', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _routeStarted ? const Color(0xFF001B44) : const Color(0xFF434750), fontFamily: 'Inter'))),
           const SizedBox(width: 12),
           const Expanded(child: Text('Próxima: Plaza de Armas', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF001B44), fontFamily: 'Inter'))),
+          IconButton(onPressed: _routeStarted ? _reportIncident : null, icon: Icon(Icons.warning_amber, color: _routeStarted ? const Color(0xFFBA1A1A) : Colors.grey, size: 22)),
         ]))),
-        if (!_routeStarted) Positioned.fill(child: Center(child: ElevatedButton.icon(
-          onPressed: () => setState(() => _routeStarted = true),
-          icon: const Icon(Icons.play_circle, size: 28),
-          label: const Text('Iniciar ruta'),
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001B44), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Inter')),
-        ))),
+        if (!_routeStarted) Positioned.fill(child: Center(child: ElevatedButton.icon(onPressed: () => setState(() => _routeStarted = true), icon: const Icon(Icons.play_circle, size: 28), label: const Text('Iniciar ruta'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001B44), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: 'Inter'))))),
         if (_routeStarted) Positioned(bottom: 0, left: 0, right: 0, child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: const BorderRadius.vertical(top: Radius.circular(20)), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 16, offset: Offset(0, -4))]), padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
           Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 12),
           Row(children: [
             if (_stopRequestPin != null) ...[
-              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.green.withAlpha(20), borderRadius: BorderRadius.circular(8)), child: Text('${_stopRequestPin!.latitude.toStringAsFixed(5)}, ${_stopRequestPin!.longitude.toStringAsFixed(5)}', style: const TextStyle(fontSize: 11, fontFamily: 'Inter', color: Color(0xFF001B44)))),
+              Expanded(child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), decoration: BoxDecoration(color: Colors.green.withAlpha(20), borderRadius: BorderRadius.circular(8)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Nueva parada en:', style: TextStyle(fontSize: 11, color: Color(0xFF434750), fontFamily: 'Inter')), Text('${_stopRequestPin!.latitude.toStringAsFixed(5)}, ${_stopRequestPin!.longitude.toStringAsFixed(5)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF001B44), fontFamily: 'Inter'))]))),
               const SizedBox(width: 8),
-              ElevatedButton(onPressed: () { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Solicitud de parada enviada'), backgroundColor: Color(0xFF001B44))); setState(() => _stopRequestPin = null); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001B44), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), textStyle: const TextStyle(fontSize: 12)), child: const Text('Enviar solicitud')),
+              ElevatedButton(onPressed: _sendStopRequest, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001B44), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14), textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)), child: const Text('Solicitar')),
             ] else ...[
               const Text('Toca el mapa para solicitar una parada', style: TextStyle(fontSize: 12, color: Color(0xFF434750), fontFamily: 'Inter')),
             ],
@@ -101,7 +125,6 @@ class _ActiveTripPageState extends ConsumerState<ActiveTripPage> {
             const SizedBox(width: 24),
             IconButton.filled(onPressed: () => _confirmPassengerChange((_passengerCount + 1).clamp(0, 40)), icon: const Icon(Icons.add), style: IconButton.styleFrom(backgroundColor: const Color(0xFF001B44).withAlpha(20), foregroundColor: const Color(0xFF001B44))),
           ]),
-          const SizedBox(height: 4),
           ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: _passengerCount / 40, minHeight: 6, backgroundColor: Colors.grey[200], valueColor: const AlwaysStoppedAnimation(Color(0xFFFED000)))),
           const SizedBox(height: 16),
           SizedBox(width: double.infinity, child: ElevatedButton.icon(onPressed: _endTrip, icon: const Icon(Icons.stop_circle, size: 18), label: const Text('Finalizar viaje'), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001B44), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))),

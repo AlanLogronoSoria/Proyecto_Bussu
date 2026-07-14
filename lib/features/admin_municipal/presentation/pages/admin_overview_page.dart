@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:latlong2/latlong.dart';
 import '../../../../shared/domain/entities/stop_entity.dart';
 import '../../../../shared/presentation/widgets/live_map_widget.dart';
 import '../providers/system_alerts_provider.dart';
@@ -29,6 +29,8 @@ class AdminOverviewPage extends ConsumerWidget {
       _buildCooperativasTable(coopStatus),
       const SizedBox(height: 20),
       _buildIncidentSummary(),
+      const SizedBox(height: 20),
+      _buildAllStopsCard(coopStatus),
     ]);
   }
 
@@ -77,7 +79,7 @@ class AdminOverviewPage extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       height: 200,
       child: Stack(children: [
-        LiveMapWidget(initialPosition: const CameraPosition(target: LatLng(-12.0464, -77.0428), zoom: 13), stops: mockStops),
+        LiveMapWidget(initialCenter: const LatLng(-12.0464, -77.0428), initialZoom: 13, stops: mockStops),
         Positioned(top: 12, left: 12, child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 4)]), child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.map, size: 16, color: Color(0xFF001B44)), SizedBox(width: 6), Text('Visualización general', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF001B44), fontFamily: 'Inter'))]))),
       ]),
     );
@@ -128,6 +130,31 @@ class AdminOverviewPage extends ConsumerWidget {
           Row(children: [Text(inc['route']!, style: const TextStyle(fontSize: 12, color: Color(0xFF434750), fontFamily: 'Inter')), const SizedBox(width: 8), Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: inc['status'] == 'Pendiente' ? const Color(0xFFBA1A1A).withAlpha(20) : inc['status'] == 'En revisión' ? const Color(0xFFFED000).withAlpha(40) : Colors.green.withAlpha(20), borderRadius: BorderRadius.circular(4)), child: Text(inc['status']!, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, fontFamily: 'Inter', color: inc['status'] == 'Pendiente' ? const Color(0xFFBA1A1A) : inc['status'] == 'En revisión' ? const Color(0xFF001B44) : Colors.green.shade700)))]),
         ])),
       ]))),
+    ]));
+  }
+
+  Widget _buildAllStopsCard(AsyncValue<List> coopStatus) {
+    const allStops = [
+      {'name': 'Plaza de Armas', 'coop': 'TransLima', 'route': 'Ruta A', 'lat': '-12.0464', 'lng': '-77.0428'},
+      {'name': 'Jr. de la Union', 'coop': 'TransLima', 'route': 'Ruta A', 'lat': '-12.0452', 'lng': '-77.0410'},
+      {'name': 'Parque Kennedy', 'coop': 'Metropolitano', 'route': 'Ruta B', 'lat': '-12.0480', 'lng': '-77.0340'},
+      {'name': 'Larcomar', 'coop': 'Metropolitano', 'route': 'Ruta B', 'lat': '-12.0490', 'lng': '-77.0350'},
+      {'name': 'San Isidro', 'coop': 'TransLima', 'route': 'Ruta C', 'lat': '-12.0430', 'lng': '-77.0370'},
+    ];
+    return Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 8)]), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [const Text('Todas las Paradas', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF001B44), fontFamily: 'Inter')), const Spacer(), Text('${allStops.length} paradas', style: const TextStyle(fontSize: 13, color: Color(0xFF434750), fontFamily: 'Inter'))]),
+      const SizedBox(height: 12),
+      SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(columnSpacing: 16, columns: const [
+        DataColumn(label: Text('Nombre', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+        DataColumn(label: Text('Cooperativa', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+        DataColumn(label: Text('Ruta', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+        DataColumn(label: Text('Coordenadas', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12))),
+      ], rows: allStops.map((s) => DataRow(cells: [
+        DataCell(Text(s['name']!, style: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Inter', color: Color(0xFF001B44)))),
+        DataCell(Text(s['coop']!, style: const TextStyle(fontFamily: 'Inter'))),
+        DataCell(Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: const Color(0xFF001B44).withAlpha(20), borderRadius: BorderRadius.circular(4)), child: Text(s['route']!, style: const TextStyle(fontSize: 12, fontFamily: 'Inter', color: Color(0xFF001B44))))),
+        DataCell(Text('${s['lat']}, ${s['lng']}', style: const TextStyle(fontSize: 11, fontFamily: 'Inter', color: Color(0xFF434750)))),
+      ])).toList())),
     ]));
   }
 }

@@ -7,6 +7,8 @@ class SystemAlert {
   final String description;
   final String? routeId;
   final String? createdBy;
+  final double? latitude;
+  final double? longitude;
   final DateTime createdAt;
   final DateTime? resolvedAt;
 
@@ -18,6 +20,8 @@ class SystemAlert {
     required this.description,
     this.routeId,
     this.createdBy,
+    this.latitude,
+    this.longitude,
     required this.createdAt,
     this.resolvedAt,
   });
@@ -30,6 +34,8 @@ class SystemAlert {
     String? description,
     String? routeId,
     String? createdBy,
+    double? latitude,
+    double? longitude,
     DateTime? createdAt,
     DateTime? resolvedAt,
   }) {
@@ -41,6 +47,8 @@ class SystemAlert {
       description: description ?? this.description,
       routeId: routeId ?? this.routeId,
       createdBy: createdBy ?? this.createdBy,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
       createdAt: createdAt ?? this.createdAt,
       resolvedAt: resolvedAt ?? this.resolvedAt,
     );
