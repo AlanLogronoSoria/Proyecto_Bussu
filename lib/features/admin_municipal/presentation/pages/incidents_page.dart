@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../../core/maps/tile_provider.dart';
 import '../../../../core/security/output_sanitizer.dart';
 import '../../../../core/utils/validators.dart';
 import '../../domain/entities/system_alert.dart';
@@ -110,6 +112,7 @@ class _IncidentsPageState extends ConsumerState<IncidentsPage> {
     _descCtrl.clear();
     String severity = 'medium';
     const scope = 'system';
+    LatLng? pickedLocation;
 
     showDialog(
       context: context,
@@ -120,15 +123,8 @@ class _IncidentsPageState extends ConsumerState<IncidentsPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: _titleCtrl,
-                  decoration: const InputDecoration(labelText: 'Título'),
-                ),
-                TextField(
-                  controller: _descCtrl,
-                  decoration: const InputDecoration(labelText: 'Descripción'),
-                  maxLines: 3,
-                ),
+                TextField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
+                TextField(controller: _descCtrl, decoration: const InputDecoration(labelText: 'Descripción'), maxLines: 3),
                 DropdownButtonFormField<String>(
                   value: severity,
                   items: const [
@@ -136,21 +132,36 @@ class _IncidentsPageState extends ConsumerState<IncidentsPage> {
                     DropdownMenuItem(value: 'medium', child: Text('Media')),
                     DropdownMenuItem(value: 'high', child: Text('Alta')),
                   ],
-                  onChanged: (v) {
-                    if (v != null) {
-                      setDialogState(() => severity = v);
-                    }
-                  },
+                  onChanged: (v) { if (v != null) setDialogState(() => severity = v); },
                   decoration: const InputDecoration(labelText: 'Severidad'),
                 ),
+                const SizedBox(height: 12),
+                const Text('Ubicación (toca el mapa)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                SizedBox(height: 150, child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: FlutterMap(
+                    options: MapOptions(
+                      initialCenter: const LatLng(-12.0464, -77.0428), initialZoom: 14,
+                      onTap: (_, p) => setDialogState(() => pickedLocation = p),
+                    ),
+                    children: [
+                      TileLayer(urlTemplate: OpenStreetMapConfig.defaultUrlTemplate, userAgentPackageName: OpenStreetMapConfig.defaultUserAgent),
+                      if (pickedLocation != null) MarkerLayer(markers: [
+                        Marker(point: pickedLocation!, width: 32, height: 32, child: const Icon(Icons.location_on, color: Colors.red, size: 32)),
+                      ]),
+                    ],
+                  ),
+                )),
+                if (pickedLocation != null) ...[
+                  const SizedBox(height: 4),
+                  Text('${pickedLocation!.latitude.toStringAsFixed(5)}, ${pickedLocation!.longitude.toStringAsFixed(5)}', style: const TextStyle(fontSize: 11, color: Color(0xFF434750))),
+                ],
               ],
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
             ElevatedButton(
               onPressed: () {
                 final repo = ref.read(networkMonitorRepositoryProvider);
@@ -158,12 +169,9 @@ class _IncidentsPageState extends ConsumerState<IncidentsPage> {
                 final desc = OutputSanitizer.sanitizeText(_descCtrl.text, maxLength: 500);
                 final titleError = Validators.validateRequired(title, 'Titulo');
                 if (titleError != null) return;
-                  repo.createAlert(SystemAlert(
-                    id: '',
-                    scope: scope,
-                    severity: severity,
-                    title: title,
-                    description: desc,
+                repo.createAlert(SystemAlert(
+                  id: '', scope: scope, severity: severity, title: title, description: desc,
+                  latitude: pickedLocation?.latitude, longitude: pickedLocation?.longitude,
                   createdAt: DateTime.now(),
                 ));
                 Navigator.pop(context);

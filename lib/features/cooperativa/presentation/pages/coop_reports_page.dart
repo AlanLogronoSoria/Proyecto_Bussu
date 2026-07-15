@@ -15,6 +15,7 @@ class CoopReportsPage extends ConsumerStatefulWidget {
 class _CoopReportsPageState extends ConsumerState<CoopReportsPage> with SingleTickerProviderStateMixin {
   late final TabController _tabCtrl;
   SystemAlert? _selectedIncident;
+  String _incidentFilter = 'all';
 
   @override
   void initState() { super.initState(); _tabCtrl = TabController(length: 3, vsync: this); }
@@ -45,10 +46,32 @@ class _CoopReportsPageState extends ConsumerState<CoopReportsPage> with SingleTi
     return alertsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF001B44))),
       error: (_, __) => const Center(child: Text('Error')),
-      data: (alerts) => ListView(padding: const EdgeInsets.all(16), children: [
-        ...alerts.map((a) => _buildIncidentCard(a)),
-      ]),
+      data: (alerts) {
+        final filtered = _incidentFilter == 'all'
+            ? alerts
+            : alerts.where((a) => a.severity == _incidentFilter).toList();
+        return ListView(padding: const EdgeInsets.all(16), children: [
+          SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+            _filterChip('Todos', 'all'), const SizedBox(width: 8),
+            _filterChip('Alta', 'high'), const SizedBox(width: 8),
+            _filterChip('Media', 'medium'), const SizedBox(width: 8),
+            _filterChip('Baja', 'low'),
+          ])),
+          const SizedBox(height: 12),
+          ...filtered.map((a) => _buildIncidentCard(a)),
+        ]);
+      },
     );
+  }
+
+  Widget _filterChip(String label, String value) {
+    final active = _incidentFilter == value;
+    final color = value == 'high' ? const Color(0xFFBA1A1A) : value == 'medium' ? const Color(0xFFFED000) : value == 'low' ? Colors.blue : const Color(0xFF001B44);
+    return GestureDetector(onTap: () => setState(() => _incidentFilter = value), child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(color: active ? color : Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: active ? color : const Color(0xFFE0E0E0))),
+      child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: active ? Colors.white : const Color(0xFF434750))),
+    ));
   }
 
   Widget _buildIncidentCard(SystemAlert a) {

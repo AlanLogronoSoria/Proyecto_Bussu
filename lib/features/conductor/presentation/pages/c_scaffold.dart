@@ -19,6 +19,9 @@ class _CScaffoldState extends ConsumerState<CScaffold> {
   @override
   Widget build(BuildContext context) {
     final hasActive = ref.watch(hasActiveTripProvider);
+    ref.listen(hasActiveTripProvider, (_, next) {
+      if (next == true) setState(() => _index = 0);
+    });
 
     return Scaffold(
       body: IndexedStack(index: _index, children: [

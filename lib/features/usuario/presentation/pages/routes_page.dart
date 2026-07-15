@@ -9,6 +9,7 @@ import '../../../../shared/domain/entities/stop_entity.dart';
 import '../../domain/entities/favorite_entity.dart';
 import '../providers/eta_provider.dart';
 import '../providers/favorites_provider.dart';
+import 'u_scaffold.dart';
 
 class RoutesPage extends ConsumerStatefulWidget {
   const RoutesPage({super.key});
@@ -18,8 +19,37 @@ class RoutesPage extends ConsumerStatefulWidget {
 
 class _RoutesPageState extends ConsumerState<RoutesPage> {
   String? _expandedRouteId;
+  final Set<String> _localFavorites = {};
   final PolylineService _polylineService = const PolylineService();
   final MapController _miniMapCtrl = MapController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final favs = ref.read(favoritesProvider).valueOrNull ?? [];
+      setState(() => _localFavorites.addAll(favs.where((f) => f.type == FavoriteType.route).map((f) => f.itemId)));
+    });
+  }
+
+  bool _isFav(String routeId) => _localFavorites.contains(routeId);
+  void _toggleFav(String routeId, String name) {
+    setState(() {
+      if (_isFav(routeId)) { _localFavorites.remove(routeId); }
+      else { _localFavorites.add(routeId); }
+    });
+  }
+
+  void _selectRoute(String routeId, WidgetRef ref) {
+    ref.read(selectedRouteIdProvider.notifier).state = routeId;
+    final scaffold = context.findAncestorStateOfType<UScaffoldState>();
+    scaffold?.switchToLive();
+    if (_expandedRouteId == routeId) {
+      setState(() => _expandedRouteId = null);
+    } else {
+      setState(() => _expandedRouteId = routeId);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -196,10 +226,7 @@ class _RoutesPageState extends ConsumerState<RoutesPage> {
           ),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              ref.read(selectedRouteIdProvider.notifier).state = id;
-              setState(() => _expandedRouteId = isExpanded ? null : id);
-            },
+            onTap: () => _selectRoute(id, ref),
             child: Padding(padding: const EdgeInsets.all(16), child: Row(children: [
               Container(width: 4, height: 40, decoration: BoxDecoration(color: Color(int.parse('FF${color.replaceAll('#', '')}', radix: 16)), borderRadius: BorderRadius.circular(2))),
               const SizedBox(width: 12),
@@ -208,6 +235,7 @@ class _RoutesPageState extends ConsumerState<RoutesPage> {
                 const SizedBox(height: 2),
                 Text(subtitle, style: const TextStyle(fontSize: 12, color: Color(0xFF434750), fontFamily: 'Inter')),
               ])),
+              if (!isFavorite) IconButton(onPressed: () => _toggleFav(id, name), icon: Icon(_isFav(id) ? Icons.star : Icons.star_border, color: _isFav(id) ? const Color(0xFFFED000) : const Color(0xFFBDBDBD), size: 22), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
               Icon(isExpanded ? Icons.expand_less : Icons.chevron_right, color: const Color(0xFF434750)),
             ])),
           ),

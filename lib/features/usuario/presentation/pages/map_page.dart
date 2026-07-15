@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/maps/polyline_service.dart';
+import '../../../../core/services/location_service.dart';
+import '../../../../shared/presentation/providers/location_provider.dart';
 import '../../../../shared/domain/entities/bus_entity.dart';
 import '../../../../shared/domain/entities/route_entity.dart';
 import '../../../../shared/domain/entities/stop_entity.dart';
@@ -20,6 +22,7 @@ class MapPage extends ConsumerStatefulWidget {
 
 class _MapPageState extends ConsumerState<MapPage> {
   bool _showStops = false;
+  LatLng? _myLocation;
   final PolylineService _polylineService = const PolylineService();
 
   @override
@@ -36,55 +39,81 @@ class _MapPageState extends ConsumerState<MapPage> {
     final favoritePolylines = allRoutes.where((r) => favoriteIds.contains(r.id)).map((r) => _polylineService.createFavoriteRoutePolyline(id: r.id, points: _polylineService.fromDoubleList(r.polyline))).toList();
     final allStops = allRoutes.expand((r) => r.stops).toList();
 
+    final userMarker = _myLocation != null ? [
+      Marker(point: _myLocation!, width: 30, height: 30, child: Container(
+        decoration: BoxDecoration(color: Colors.blue.withAlpha(200), shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)]),
+        child: const Icon(Icons.my_location, color: Colors.white, size: 16),
+      )),
+    ] : <Marker>[];
+
     return Scaffold(
+      floatingActionButton: FloatingActionButton.small(
+        onPressed: _centerOnUser,
+        backgroundColor: Colors.white,
+        child: const Icon(Icons.my_location, color: Color(0xFF001B44)),
+      ),
       body: Stack(children: [
         LiveMapWidget(
-          initialCenter: const LatLng(-12.0464, -77.0428),
+          initialCenter: _myLocation ?? const LatLng(-12.0464, -77.0428),
           initialZoom: 14,
           buses: buses,
           activeRoute: routeWithBuses.valueOrNull?.route,
           stops: _showStops ? allStops : stops,
           extraPolylines: favoritePolylines,
+          extraMarkers: userMarker,
           onStopTapped: _showStopInfo,
         ),
-        Positioned(top: 56, left: 16, right: 16, child: _buildSearchBar()),
+        Positioned(top: 56, left: 16, right: 72, child: _buildSearchBar()),
         Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomSheet(allStops, allRoutes)),
       ]),
     );
   }
 
-  void _showStopInfo(StopEntity stop) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
-        const SizedBox(height: 16),
-        Row(children: [
-          Container(width: 40, height: 40, decoration: BoxDecoration(color: Colors.blue.shade700, borderRadius: BorderRadius.circular(10)), child: Center(child: Text('${stop.orderIndex}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)))),
-          const SizedBox(width: 12),
-          Expanded(child: Text(stop.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF001B44), fontFamily: 'Inter'))),
-        ]),
-        const SizedBox(height: 16),
-        _infoRow(Icons.location_on, '${stop.latitude.toStringAsFixed(5)}, ${stop.longitude.toStringAsFixed(5)}'),
-        const SizedBox(height: 8),
-        _infoRow(Icons.alt_route, 'Parada #${stop.orderIndex}'),
-        if (stop.distanceAlongRoute != null) ... [
-          const SizedBox(height: 8),
-          _infoRow(Icons.straighten, '${(stop.distanceAlongRoute! / 1000).toStringAsFixed(2)} km desde inicio'),
-        ],
-      ])),
-    );
+  void _centerOnUser() async {
+    try {
+      final loc = await _requestLocation();
+      if (loc != null && mounted) {
+        setState(() => _myLocation = LatLng(loc.latitude, loc.longitude));
+      }
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo obtener la ubicación. Verifica los permisos de GPS.'), backgroundColor: Color(0xFFBA1A1A)));
+    }
   }
 
-  Widget _infoRow(IconData icon, String text) {
-    return Row(children: [Icon(icon, size: 18, color: const Color(0xFF434750)), const SizedBox(width: 8), Text(text, style: const TextStyle(fontSize: 14, color: Color(0xFF434750), fontFamily: 'Inter'))]);
+  Future<LocationData?> _requestLocation() async {
+    final service = ref.read(locationServiceProvider);
+    final permission = await service.hasPermission();
+    if (!permission) {
+      final granted = await service.requestPermission();
+      if (!granted) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permiso de ubicación denegado'), backgroundColor: Color(0xFFBA1A1A)));
+        return null;
+      }
+    }
+    final result = await service.getCurrentLocation();
+    return result.fold((failure) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failure.message.toString()), backgroundColor: const Color(0xFFBA1A1A)));
+      return null;
+    }, (loc) => loc);
   }
+
+  void _showStopInfo(StopEntity stop) {
+    showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))), builder: (_) => Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+      const SizedBox(height: 16),
+      Row(children: [Container(width: 40, height: 40, decoration: BoxDecoration(color: Colors.blue.shade700, borderRadius: BorderRadius.circular(10)), child: Center(child: Text('${stop.orderIndex}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)))), const SizedBox(width: 12), Expanded(child: Text(stop.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF001B44), fontFamily: 'Inter')))]),
+      const SizedBox(height: 16),
+      _infoRow(Icons.location_on, '${stop.latitude.toStringAsFixed(5)}, ${stop.longitude.toStringAsFixed(5)}'),
+      const SizedBox(height: 8),
+      _infoRow(Icons.alt_route, 'Parada #${stop.orderIndex}'),
+      if (stop.distanceAlongRoute != null) ...[const SizedBox(height: 8), _infoRow(Icons.straighten, '${(stop.distanceAlongRoute! / 1000).toStringAsFixed(2)} km desde inicio')],
+    ])));
+  }
+
+  Widget _infoRow(IconData icon, String text) => Row(children: [Icon(icon, size: 18, color: const Color(0xFF434750)), const SizedBox(width: 8), Text(text, style: const TextStyle(fontSize: 14, color: Color(0xFF434750), fontFamily: 'Inter'))]);
 
   Widget _buildSearchBar() {
-    return Row(children: [
-      Expanded(child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 12, offset: Offset(0, 4))]), child: TextField(decoration: InputDecoration(hintText: 'Buscar destino o ruta...', hintStyle: const TextStyle(color: Color(0xFF434750), fontSize: 14), prefixIcon: const Icon(Icons.search, color: Color(0xFF001B44)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none), filled: true, fillColor: Colors.white, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)))),),
-    ]);
+    return Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 12, offset: Offset(0, 4))]), child: TextField(decoration: InputDecoration(hintText: 'Buscar destino o ruta...', hintStyle: const TextStyle(color: Color(0xFF434750), fontSize: 14), prefixIcon: const Icon(Icons.search, color: Color(0xFF001B44)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none), filled: true, fillColor: Colors.white, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12))));
   }
 
   Widget _buildBottomSheet(List<StopEntity> allStops, List<RouteEntity> allRoutes) {
@@ -100,9 +129,7 @@ class _MapPageState extends ConsumerState<MapPage> {
           final fav = favRoutes[i]; final selected = ref.watch(selectedRouteIdProvider) == fav.itemId;
           final chipColor = selected ? const Color(0xFF001B44) : const Color(0xFFFED000).withAlpha(30);
           final textColor = selected ? Colors.white : const Color(0xFF001B44);
-          final iconW = selected ? Icons.star : Icons.star_border;
-          final iconC = selected ? const Color(0xFF001B44) : const Color(0xFFFED000);
-          return GestureDetector(onTap: () => ref.read(selectedRouteIdProvider.notifier).state = fav.itemId, child: Chip(avatar: Icon(iconW, size: 16, color: iconC), label: Text(fav.name, style: TextStyle(fontSize: 12, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: textColor, fontFamily: 'Inter')), backgroundColor: chipColor));
+          return GestureDetector(onTap: () => ref.read(selectedRouteIdProvider.notifier).state = fav.itemId, child: Chip(avatar: const Icon(Icons.star, size: 16, color: Color(0xFFFED000)), label: Text(fav.name, style: TextStyle(fontSize: 12, fontWeight: selected ? FontWeight.w600 : FontWeight.w400, color: textColor, fontFamily: 'Inter')), backgroundColor: chipColor));
         })),
         const SizedBox(height: 12),
       ],

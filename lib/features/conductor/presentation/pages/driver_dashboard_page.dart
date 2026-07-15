@@ -1,8 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../../core/services/location_service.dart';
+import '../../../../shared/presentation/providers/location_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../providers/trip_provider.dart';
 
 final tripActiveProvider = StateProvider<bool>((ref) => false);
+final driverLocationProvider = StateProvider<LatLng?>((ref) => null);
 
 class DriverDashboardPage extends ConsumerStatefulWidget {
   const DriverDashboardPage({super.key});
@@ -12,6 +18,60 @@ class DriverDashboardPage extends ConsumerStatefulWidget {
 
 class _DriverDashboardPageState extends ConsumerState<DriverDashboardPage> {
   int _passengerCount = 0;
+  StreamSubscription<LocationData>? _locationSub;
+
+  @override
+  void dispose() {
+    _locationSub?.cancel();
+    super.dispose();
+  }
+
+  void _startTrip() async {
+    final service = ref.read(locationServiceProvider);
+    final permission = await service.hasPermission();
+    if (!permission) {
+      final granted = await service.requestPermission();
+      if (!granted) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Se requiere permiso de ubicación para iniciar el viaje'), backgroundColor: Color(0xFFBA1A1A)));
+        return;
+      }
+    }
+    final result = await service.getCurrentLocation();
+    result.fold(
+      (f) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(f.message.toString()), backgroundColor: const Color(0xFFBA1A1A))); },
+      (loc) {
+        if (!mounted) return;
+        final latLng = LatLng(loc.latitude, loc.longitude);
+        ref.read(driverLocationProvider.notifier).state = latLng;
+        ref.read(tripActiveProvider.notifier).state = true;
+        ref.read(startTripUseCaseProvider).execute(driverId: 'current-driver', busId: 'bus-123', routeId: 'route-a');
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Viaje iniciado — ubicación en tiempo real activada'), backgroundColor: Color(0xFF001B44)));
+        _startPublishingLocation(service);
+      },
+    );
+  }
+
+  void _startPublishingLocation(LocationService service) {
+    _locationSub?.cancel();
+    _locationSub = service.onLocationChanged.listen((loc) {
+      if (!mounted) return;
+      final latLng = LatLng(loc.latitude, loc.longitude);
+      ref.read(driverLocationProvider.notifier).state = latLng;
+      ref.read(publishTelemetryUseCaseProvider).execute(
+        busId: 'bus-123', lat: loc.latitude, lng: loc.longitude,
+        speedKmh: loc.speed ?? 0, heading: loc.heading ?? 0,
+      );
+    });
+  }
+
+  void _endTrip() {
+    _locationSub?.cancel();
+    _locationSub = null;
+    ref.read(tripActiveProvider.notifier).state = false;
+    ref.read(driverLocationProvider.notifier).state = null;
+    ref.read(endTripUseCaseProvider).execute('current-trip');
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Viaje finalizado — recursos liberados'), backgroundColor: Color(0xFF001B44)));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +101,7 @@ class _DriverDashboardPageState extends ConsumerState<DriverDashboardPage> {
           Text(active ? 'Viaje en curso' : 'Listo para iniciar', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: active ? const Color(0xFF001B44) : const Color(0xFF434750), fontFamily: 'Inter')),
           const SizedBox(height: 16),
           SizedBox(width: double.infinity, child: ElevatedButton(
-            onPressed: () => ref.read(tripActiveProvider.notifier).state = !active,
+            onPressed: active ? _endTrip : _startTrip,
             style: ElevatedButton.styleFrom(backgroundColor: active ? const Color(0xFFBA1A1A) : const Color(0xFF001B44), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Inter')),
             child: Text(active ? 'Finalizar viaje' : 'Iniciar viaje'),
           )),

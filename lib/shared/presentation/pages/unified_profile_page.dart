@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_roles.dart';
 import '../../../features/auth/presentation/providers/auth_provider.dart';
+import '../../../features/conductor/presentation/pages/incident_report_page.dart';
+import 'help/help_page.dart';
+import 'help/privacy_agreement_page.dart';
 
 final notifToggleProvider = StateProvider<bool>((ref) => true);
 
@@ -13,7 +16,6 @@ class UnifiedProfilePage extends ConsumerWidget {
     final role = user?.role;
     final isPremium = user?.isPremium ?? false;
     final notifs = ref.watch(notifToggleProvider);
-
     final isUsuario = role == UserRole.usuario;
     final isConductor = role == UserRole.conductor;
 
@@ -38,19 +40,32 @@ class UnifiedProfilePage extends ConsumerWidget {
         const SizedBox(height: 16),
       ],
       if (isConductor) ...[
-        _buildDashboardButton(context),
         const SizedBox(height: 16),
       ],
       Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 8)]), child: Column(children: [
         if (isUsuario) ...[
-          _buildListItem(Icons.star_outline, 'Rutas Favoritas', const Color(0xFF001B44), () {}),
+          _buildListItem(Icons.help_outline, 'Ayuda', const Color(0xFF001B44), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpPage()))),
           const Divider(height: 1, indent: 56),
         ],
-        _buildListItem(Icons.warning_amber_outlined, 'Reportar incidente', const Color(0xFFBA1A1A), () {}),
-        const Divider(height: 1, indent: 56),
-        _buildListItem(Icons.help_outline, 'Ayuda', const Color(0xFF001B44), () {}),
-        const Divider(height: 1, indent: 56),
-        _buildListItem(Icons.headset_mic_outlined, 'Soporte', const Color(0xFF001B44), () {}),
+        if (isConductor) ...[
+          _buildListItem(Icons.warning_amber_outlined, 'Reportar incidente', const Color(0xFFBA1A1A), () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const IncidentReportPage()));
+          }),
+          const Divider(height: 1, indent: 56),
+          _buildListItem(Icons.help_outline, 'Ayuda', const Color(0xFF001B44), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpPage()))),
+          const Divider(height: 1, indent: 56),
+        ],
+        if (!isUsuario && !isConductor) ...[
+          _buildListItem(Icons.warning_amber_outlined, 'Reportar incidente', const Color(0xFFBA1A1A), () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const IncidentReportPage(role: 'cooperativa')));
+          }),
+          const Divider(height: 1, indent: 56),
+          _buildListItem(Icons.help_outline, 'Ayuda', const Color(0xFF001B44), () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpPage()))),
+          const Divider(height: 1, indent: 56),
+        ],
+        _buildListItem(Icons.description_outlined, 'Contrato de Confidencialidad', const Color(0xFF001B44), () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const PrivacyAgreementPage()));
+        }),
         const Divider(height: 1, indent: 56),
         ListTile(leading: const Icon(Icons.notifications_outlined, color: Color(0xFF001B44)), title: const Text('Notificaciones', style: TextStyle(fontFamily: 'Inter', color: Color(0xFF001B44))), trailing: Switch(value: notifs, activeColor: const Color(0xFF001B44), onChanged: (v) => ref.read(notifToggleProvider.notifier).state = v)),
       ])),

@@ -8,6 +8,7 @@ import '../../../../shared/domain/entities/stop_entity.dart';
 import '../../../../shared/presentation/widgets/live_map_widget.dart';
 import '../../../admin_municipal/presentation/providers/system_alerts_provider.dart';
 import '../../../admin_municipal/domain/entities/system_alert.dart';
+import '../../../../core/services/location_service.dart';
 import '../providers/trip_provider.dart';
 import 'driver_dashboard_page.dart';
 
@@ -90,12 +91,21 @@ class _ActiveTripPageState extends ConsumerState<ActiveTripPage> {
     final hasActive = ref.watch(hasActiveTripProvider);
     if (!hasActive) return const DriverDashboardPage();
 
+    final driverLoc = ref.watch(driverLocationProvider);
     final extraMarkers = <Marker>[];
     if (_stopRequestPin != null) extraMarkers.add(_markerService.createRequestMarker(id: 'stop_req', point: _stopRequestPin!, title: 'Solicitud'));
+    if (driverLoc != null) {
+      extraMarkers.add(Marker(point: driverLoc, width: 36, height: 36, child: Container(
+        decoration: BoxDecoration(color: Colors.blue.withAlpha(220), shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)]),
+        child: const Icon(Icons.navigation, color: Colors.white, size: 20),
+      )));
+    }
+
+    final mapCenter = driverLoc ?? const LatLng(-12.0464, -77.0428);
 
     return Scaffold(
       body: Stack(children: [
-        LiveMapWidget(initialCenter: const LatLng(-12.0464, -77.0428), initialZoom: 15, activeRoute: _routeStarted ? _mockRoute : null, stops: _routeStarted ? _mockRoute.stops : [], extraMarkers: extraMarkers, onMapTapped: (pos) { if (_routeStarted) setState(() => _stopRequestPin = pos); }),
+        LiveMapWidget(initialCenter: mapCenter, initialZoom: 15, activeRoute: _routeStarted ? _mockRoute : null, stops: _routeStarted ? _mockRoute.stops : [], extraMarkers: extraMarkers, onMapTapped: (pos) { if (_routeStarted) setState(() => _stopRequestPin = pos); }),
         Positioned(top: 56, left: 16, right: 16, child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x14002F6C), blurRadius: 8)]), child: Row(children: [
           Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: _routeStarted ? const Color(0xFFFED000) : Colors.grey[300]!, borderRadius: BorderRadius.circular(8)), child: Text(_routeStarted ? 'En Ruta' : 'Detenido', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _routeStarted ? const Color(0xFF001B44) : const Color(0xFF434750), fontFamily: 'Inter'))),
           const SizedBox(width: 12),

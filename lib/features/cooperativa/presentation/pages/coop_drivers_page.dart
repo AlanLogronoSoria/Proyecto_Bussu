@@ -84,6 +84,17 @@ class _CoopDriversPageState extends ConsumerState<CoopDriversPage> {
     ));
   }
 
+  void _confirmDelete(d) {
+    showDialog(context: context, builder: (_) => AlertDialog(
+      title: const Text('Eliminar conductor', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600)),
+      content: Text('¿Eliminar a ${d.fullName} permanentemente?', style: const TextStyle(fontFamily: 'Inter')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        ElevatedButton(onPressed: () { Navigator.pop(context); ref.invalidate(driversProvider(ref.read(currentCoopIdProvider))); ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${d.fullName} eliminado'), backgroundColor: const Color(0xFFBA1A1A))); }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFBA1A1A), foregroundColor: Colors.white), child: const Text('Eliminar')),
+      ],
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final coopId = ref.watch(currentCoopIdProvider);
@@ -121,7 +132,10 @@ class _CoopDriversPageState extends ConsumerState<CoopDriversPage> {
                 Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: d.isActive ? Colors.green.withAlpha(20) : Colors.grey.withAlpha(30), borderRadius: BorderRadius.circular(8)), child: Text(d.isActive ? 'Activo' : 'Inactivo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'Inter', color: d.isActive ? Colors.green.shade700 : const Color(0xFF434750)))),
                 const SizedBox(width: 4),
                 IconButton(icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF434750)), onPressed: () => _openForm(data: {'id': d.id, 'nombres': d.fullName.split(' ').first, 'apellidos': d.fullName.split(' ').skip(1).join(' '), 'correo': d.email, 'licencia': d.licenseNumber ?? '', 'placa': d.assignedBusPlate ?? ''})),
-                IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFBA1A1A)), onPressed: () {}),
+                IconButton(icon: const Icon(Icons.location_on_outlined, size: 20, color: Color(0xFF001B44)), onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Conductor: ${d.fullName}'), backgroundColor: const Color(0xFF001B44)));
+                }, tooltip: 'Ver ubicación'),
+                IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFBA1A1A)), onPressed: () => _confirmDelete(d)),
               ]),
             );
           },

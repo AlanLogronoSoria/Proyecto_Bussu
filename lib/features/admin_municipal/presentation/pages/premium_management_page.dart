@@ -76,6 +76,8 @@ class _PremiumManagementPageState extends ConsumerState<PremiumManagementPage> {
     final status = s['status'] as String? ?? 'active';
     final planId = s['plan_id'] as String? ?? 'premium';
     final id = s['id'] as String? ?? '';
+    final createdAt = s['created_at'] as String?;
+    final expiresAt = s['expires_at'] as String?;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(16),
@@ -97,6 +99,20 @@ class _PremiumManagementPageState extends ConsumerState<PremiumManagementPage> {
             Text('Plan: $planId', style: const TextStyle(fontSize: 11, color: Color(0xFF434750), fontFamily: 'Inter')),
           ]),
         ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          if (createdAt != null) ...[
+            const Icon(Icons.calendar_today, size: 12, color: Color(0xFF434750)),
+            const SizedBox(width: 4),
+            Text('Inicio: ${_fmtDate(createdAt)}', style: const TextStyle(fontSize: 11, color: Color(0xFF434750), fontFamily: 'Inter')),
+            const SizedBox(width: 14),
+          ],
+          if (expiresAt != null) ...[
+            const Icon(Icons.event_busy, size: 12, color: Color(0xFF434750)),
+            const SizedBox(width: 4),
+            Text('Expira: ${_fmtDate(expiresAt)}', style: const TextStyle(fontSize: 11, color: Color(0xFF434750), fontFamily: 'Inter')),
+          ],
+        ]),
         const SizedBox(height: 12),
         Row(children: [
           if (status == 'active') Expanded(child: OutlinedButton.icon(onPressed: () => _suspend(id, ref), icon: const Icon(Icons.pause_circle_outline, size: 16), label: const Text('Suspender'), style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFBA1A1A), side: const BorderSide(color: Color(0xFFBA1A1A)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), padding: const EdgeInsets.symmetric(vertical: 10)))),
@@ -104,6 +120,10 @@ class _PremiumManagementPageState extends ConsumerState<PremiumManagementPage> {
         ]),
       ]),
     );
+  }
+
+  String _fmtDate(String iso) {
+    try { final d = DateTime.parse(iso); return '${d.day}/${d.month}/${d.year}'; } catch (_) { return iso; }
   }
 
   void _suspend(String id, WidgetRef ref) {

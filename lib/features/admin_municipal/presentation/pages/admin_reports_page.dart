@@ -15,46 +15,65 @@ class AdminReportsPage extends ConsumerStatefulWidget {
 }
 
 class _AdminReportsPageState extends ConsumerState<AdminReportsPage> {
-  late final TextEditingController _titleCtrl, _descCtrl, _latCtrl, _lngCtrl;
+  late final TextEditingController _titleCtrl, _descCtrl;
   SystemAlert? _selected;
+  LatLng? _pickedLocation;
+  String? _pickedAddress;
 
   @override
   void initState() {
     super.initState();
-    _titleCtrl = TextEditingController(); _descCtrl = TextEditingController();
-    _latCtrl = TextEditingController(); _lngCtrl = TextEditingController();
+    _titleCtrl = TextEditingController();
+    _descCtrl = TextEditingController();
   }
 
   @override
-  void dispose() { _titleCtrl.dispose(); _descCtrl.dispose(); _latCtrl.dispose(); _lngCtrl.dispose(); super.dispose(); }
+  void dispose() { _titleCtrl.dispose(); _descCtrl.dispose(); super.dispose(); }
 
   void _createIncident() {
-    _titleCtrl.clear(); _descCtrl.clear(); _latCtrl.clear(); _lngCtrl.clear();
-    showDialog(context: context, builder: (_) => AlertDialog(
+    _titleCtrl.clear(); _descCtrl.clear();
+    _pickedLocation = null; _pickedAddress = null;
+    showDialog(context: context, builder: (_) => StatefulBuilder(builder: (ctx, setDialogState) => AlertDialog(
       title: const Text('Nuevo Incidente', style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600)),
       content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Título', border: OutlineInputBorder())),
         const SizedBox(height: 8),
         TextField(controller: _descCtrl, maxLines: 3, decoration: const InputDecoration(labelText: 'Descripción', border: OutlineInputBorder())),
         const SizedBox(height: 12),
-        const Text('Ubicación (opcional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        Row(children: [
-          Expanded(child: TextField(controller: _latCtrl, decoration: const InputDecoration(labelText: 'Lat', isDense: true, border: OutlineInputBorder()), keyboardType: TextInputType.number)),
-          const SizedBox(width: 8),
-          Expanded(child: TextField(controller: _lngCtrl, decoration: const InputDecoration(labelText: 'Lng', isDense: true, border: OutlineInputBorder()), keyboardType: TextInputType.number)),
-        ]),
+        const Text('Ubicación (toca el mapa)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        SizedBox(height: 160, child: ClipRRect(borderRadius: BorderRadius.circular(10), child: FlutterMap(
+          options: MapOptions(
+            initialCenter: const LatLng(-12.0464, -77.0428), initialZoom: 14,
+            onTap: (_, p) async {
+              setDialogState(() { _pickedLocation = p; _pickedAddress = null; });
+              final addr = await ref.read(addressLookupProvider((lat: p.latitude, lng: p.longitude)).future);
+              if (addr != null && ctx.mounted) setDialogState(() => _pickedAddress = addr);
+            },
+          ),
+          children: [
+            TileLayer(urlTemplate: OpenStreetMapConfig.defaultUrlTemplate, userAgentPackageName: OpenStreetMapConfig.defaultUserAgent),
+            if (_pickedLocation != null) MarkerLayer(markers: [Marker(point: _pickedLocation!, width: 32, height: 32, child: const Icon(Icons.location_on, color: Colors.red, size: 32))]),
+          ],
+        ))),
+        if (_pickedLocation != null) ...[
+          const SizedBox(height: 6),
+          Text('${_pickedLocation!.latitude.toStringAsFixed(5)}, ${_pickedLocation!.longitude.toStringAsFixed(5)}', style: const TextStyle(fontSize: 11, color: Color(0xFF434750), fontFamily: 'Inter')),
+        ],
+        if (_pickedAddress != null) ...[
+          const SizedBox(height: 2),
+          Row(children: [const Icon(Icons.home, size: 12, color: Color(0xFF001B44)), const SizedBox(width: 4), Expanded(child: Text(_pickedAddress!, style: const TextStyle(fontSize: 11, color: Color(0xFF001B44), fontFamily: 'Inter'), maxLines: 2, overflow: TextOverflow.ellipsis))]),
+        ],
       ])),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         ElevatedButton(onPressed: () {
-          final lat = double.tryParse(_latCtrl.text);
-          final lng = double.tryParse(_lngCtrl.text);
           final repo = ref.read(networkMonitorRepositoryProvider);
-          repo.createAlert(SystemAlert(id: '', scope: 'system', severity: 'medium', title: _titleCtrl.text, description: _descCtrl.text, latitude: lat, longitude: lng, createdAt: DateTime.now()));
+          repo.createAlert(SystemAlert(id: '', scope: 'system', severity: 'medium', title: _titleCtrl.text, description: _descCtrl.text, latitude: _pickedLocation?.latitude, longitude: _pickedLocation?.longitude, createdAt: DateTime.now()));
           Navigator.pop(context);
         }, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF001B44)), child: const Text('Crear')),
       ],
-    ));
+    )));
   }
 
   @override

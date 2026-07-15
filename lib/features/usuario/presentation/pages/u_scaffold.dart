@@ -9,10 +9,10 @@ class UScaffold extends StatefulWidget {
   final int initialIndex;
   const UScaffold({super.key, this.initialIndex = 0});
   @override
-  State<UScaffold> createState() => _UScaffoldState();
+  UScaffoldState createState() => UScaffoldState();
 }
 
-class _UScaffoldState extends State<UScaffold> {
+class UScaffoldState extends State<UScaffold> {
   late int _index = widget.initialIndex;
 
   static const _pages = [MapPage(), RoutesPage(), TicketsPage(), AlertsPage(), UnifiedProfilePage()];
@@ -37,5 +37,5 @@ class _UScaffoldState extends State<UScaffold> {
   }
 
   void switchTo(int index) => setState(() => _index = index);
-  void showRouteOnMap(String routeId) => setState(() => _index = 0);
+  void switchToLive() => setState(() => _index = 0);
 }
